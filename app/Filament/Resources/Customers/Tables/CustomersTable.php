@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\Customers\Tables;
 
+use App\Filament\Resources\Invoices\InvoiceResource;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use App\Filament\Resources\Invoices\InvoicesResource;
+use App\Models\Customer;
+use Filament\Actions\Action as ActionsAction;
 
 class CustomersTable
 {
@@ -49,6 +53,32 @@ class CustomersTable
             ])
             ->recordActions([
                 EditAction::make(),
+
+                ActionsAction::make('ver_facturas')
+                    ->label('Ver facturas')
+                    ->icon('heroicon-m-document-text')
+                    ->slideOver() // opcional (quítalo si prefieres modal centrado)
+                    ->modalWidth('7xl')
+                    ->modalHeading(fn(Customer $r) => 'Facturas de ' . $r->name)
+                    ->modalSubmitAction(false)
+                    ->modalContent(function (Customer $record) {
+                        $invoices = $record->invoices()
+                            ->withSum('payments', 'amount') // payments_sum_amount
+                            ->orderByDesc('date')
+                            ->get();
+
+                        $totalFacturas = (float) $invoices->sum('total');
+                        $totalAbonos   = (float) $invoices->sum('payments_sum_amount');
+                        $totalSaldo    = max(0, $totalFacturas - $totalAbonos);
+
+                        return view('cartera-modal', [
+                            'customer'      => $record,
+                            'invoices'      => $invoices,
+                            'totalFacturas' => $totalFacturas,
+                            'totalAbonos'   => $totalAbonos,
+                            'totalSaldo'    => $totalSaldo,
+                        ]);
+                    }),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
